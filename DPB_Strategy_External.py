@@ -1,20 +1,18 @@
 from common_functions_ext import n_decim, two_decim, dt_to_str, str_to_dt
 from convert_to_ohlc_ext import TradingViewData
+from get_earnings_ext import GetEarnings
 from update_data_ext import UpdateStockData
 from create_batch import CreateBatch
 from pandas_datareader.data import get_data_yahoo as ydata
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from datetime import timedelta
-from bs4 import BeautifulSoup
 from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import datetime
 import re
-import json
-import requests
 import copy
 import os
 import threading
@@ -66,7 +64,7 @@ class Stock:
         self.get_ohlc_table(args['start_dt'], args['end_dt'], args['use_yfin'],
                             args['same_folder'])
 
-        # self.get_earnings()
+        self.get_earnings(ticker)
 
         args = methods_args['get_periods']
         self.get_periods(args['pct_drop'], args['sec_drop'], args['only_rec'])
@@ -143,7 +141,7 @@ class Stock:
                 stock = ydata(self.ticker, start=start_dt, end=end_dt)
             self.ohlc_table = stock[['Open', 'High', 'Low', 'Close']]
 
-    def get_earnings(self):
+    def get_earnings(self, ticker):
         '''
         Gets stock historical earnings releases dates from scraping yahoo
         finance and stores them in lst_earnings_dt
@@ -151,18 +149,8 @@ class Stock:
             lst_earnings_dt value types = strings, format(YYYY-MM-DD)'''
 
         # TODO Fix this method
-        self.lst_earnings_dt = []
-        url_e_releases = '''https://ca.finance.yahoo.com/calendar/earnings?day=2020-10-11&symbol=MSFT'''
-        response = requests.get(url_e_releases)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        pattern = re.compile(r'\s--\sData\s--\s')
-        script_data = soup.find('script', text=pattern).contents[0]
-        start = script_data.find('context') - 2
-        json_data = json.loads(script_data[start:-12])
-        lst_earnings_dt = json_data['context']['dispatcher']['stores']['ScreenerResultsStore']['results']['rows']
-
-        for earning_release in lst_earnings_dt:
-            self.lst_earnings_dt.append(earning_release["startdatetime"][:10])
+        earnings_obj = GetEarnings(ticker)
+        self.lst_earnings_dt = earnings_obj.get_earnings()
 
     def get_periods(self, pct_drop, sec_drop, only_rec):
         '''
@@ -649,11 +637,11 @@ class Stock:
                     add_trades(op)
                     reset_trading_var()
 
-                '''if self.in_trade and sdt in self.lst_earnings_dt:
+                if self.in_trade and sdt in self.lst_earnings_dt:
                     if np.busday_count(self.ent_dt, sdt) > 4:
                         add_trades(prev_day_cl, use_prev_dt=True)
 
-                    reset_trading_var()'''
+                    reset_trading_var()
 
                 if self.in_trade:
                     higher_res_p, higher_res_take = 0, 0
