@@ -3,8 +3,6 @@
 
 ## Table of content
 * [General Info](#general-info)
-  * [Description of Initial Folders and Files](#description-of-initial-folders-and-files)
-  * [Description of Folders Created After DPB_Strategy_External.py Runs](#description-of-dolders-dreated-after-dpb_atrategy_external.py-Runs)
 * [Strategy Overview](#strategy-overview)
 * [Technologies](#technologies)
 * [Set up](#setup)
@@ -51,7 +49,7 @@
     * Opens pickle file in command prompt
 
 ## Strategy Overview
-### Theory of Strategy (not neccessarily right)
+### Strategy Theory (not neccessarily right)
 * Stocks have greater growth potential after a large decline
 * Resistance levels dictate on when to sell and if to enter
 ### Entry Criteria (all number criterias can be modified in DPB_Strategy_External.py without modifying the class)
