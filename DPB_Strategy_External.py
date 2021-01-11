@@ -148,7 +148,6 @@ class Stock:
 
             lst_earnings_dt value types = strings, format(YYYY-MM-DD)'''
 
-        # TODO Fix this method
         earnings_obj = GetEarnings(ticker)
         self.lst_earnings_dt = earnings_obj.get_earnings()
 
