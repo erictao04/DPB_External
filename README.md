@@ -12,6 +12,9 @@
 #### DPB_Strategy_External.py
   * Only program you need to run
   * Uses all the files and folders below
+#### Raw_DPB_Strategy.py
+  * Identical to DPB_Strategy_External.py except without the docstrings
+  * Clearer to read on GitHub website
 #### Raw_Data
   * Folder of CSV files of stock data
 #### common_functions_ext.py
