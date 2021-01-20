@@ -43,44 +43,45 @@ def num_to_pct(num):
 
 
 class Stock:
-    def __init__(self, ticker, methods_args, freq="1D"):
 
+    def __init__(self, ticker, use_existing=False, start_dt='',
+                 end_dt='', use_yfin=False, same_folder=True, pct_drop=20,
+                 sec_drop=30, only_rec=False, stop_pct=.5, take_pct=1.5,
+                 default_pct=9, res_diff=7.5, res_hld_bef=3, res_hld_aft=3,
+                 days_apart=7, inv_days=100, hg_diff=2, aut_stp_pct=2,
+                 sell_pct=1, sec_sell=.5, hld_days=1.0, export_pandas=False,
+                 export_excel=False, freq="1D", trg_hld_bef=3, trg_hld_aft=7,
+                 single_stock=False, visualize=False):
+
+        hld_days = float(hld_days)
+        self.single_stock = single_stock
         self.ticker = ticker.upper()
         self.tf = freq
         self.ticker_tf = f"{self.ticker}_{freq}"
 
-        args = methods_args['convert_data']
-        self.convert_data(args['use_existing'])
+        self.convert_data(use_existing)
 
-        args = methods_args['get_ohlc_table']
-        self.get_ohlc_table(args['start_dt'], args['end_dt'], args['use_yfin'],
-                            args['same_folder'])
+        self.get_ohlc_table(start_dt, end_dt, use_yfin, same_folder)
 
         self.get_earnings(ticker)
 
-        args = methods_args['get_periods']
-        self.get_periods(args['pct_drop'], args['sec_drop'], args['only_rec'])
+        self.get_periods(pct_drop, sec_drop, only_rec)
 
-        args = methods_args['get_resistances']
-        self.get_resistances(args['stop_pct'], args['take_pct'],
-                             args['default_pct'], args['res_diff'],
-                             args['hld_bef'], args['hld_aft'])
+        self.get_resistances(stop_pct, take_pct, default_pct, res_diff,
+                             res_hld_bef, res_hld_aft)
 
-        args = methods_args['get_triggers']
-        self.get_triggers(args['days_apart'], args['inv_days'],
-                          args['hld_bef'], args['hld_aft'], args['hg_diff'])
+        self.get_triggers(days_apart, inv_days, trg_hld_bef, trg_hld_aft,
+                          hg_diff)
 
-        args = methods_args['get_trades']
-        self.get_trades(args['aut_stp_pct'], args['sell_pct'],
-                        args['sec_sell'], args['hld_days'])
+        self.get_trades(aut_stp_pct, sell_pct, sec_sell, hld_days)
 
         self.get_results()
 
-        args = methods_args['export_pandas']
-        self.export_pandas(args['export'])
+        self.export_pandas(export_pandas)
 
-        args = methods_args['export_excel']
-        self.export_excel(args['export'])
+        self.export_excel(export_excel)
+
+        self.visualise(visualize)
 
     def convert_data(self, use_existing):
         if not use_existing:
@@ -90,7 +91,6 @@ class Stock:
             data_df.to_pickle()
 
     def get_ohlc_table(self, start_dt, end_dt, use_yfin, same_folder):
-
         if not use_yfin:
             if not same_folder:
                 file_dir = r"E:\Python\Stock_Data\1D\\"
@@ -125,13 +125,13 @@ class Stock:
             self.ohlc_table = stock[['Open', 'High', 'Low', 'Close']]
 
     def get_earnings(self, ticker):
+
         earnings_obj = GetEarnings(ticker)
         self.lst_earnings_dt = earnings_obj.get_earnings()
 
     def get_periods(self, pct_drop, sec_drop, only_rec):
 
         def reset_prd_var(dip=False):
-
             if not dip:
                 self.cur_hgst_p = 0
                 self.prd_start = None
@@ -829,8 +829,13 @@ class Stock:
 
         os.makedirs('Results', exist_ok=True)
         os.makedirs('Stats', exist_ok=True)
-        results_filepath = Path(Path.cwd())/'Results'/'1d_hld.pkl'
-        stats_filepath = Path(Path.cwd())/'Stats'/'1d_hld.pkl'
+        if not self.single_stock:
+            results_filepath = Path(Path.cwd())/'Results'/'1D_all.pkl'
+            stats_filepath = Path(Path.cwd())/'Stats'/'1D_all.pkl'
+        else:
+            results_filepath = Path(Path.cwd()) / \
+                'Results'/f'{self.ticker_tf}.pkl'
+            stats_filepath = Path(Path.cwd())/'Stats'/f'{self.ticker_tf}.pkl'
 
         try:
             all_results = pd.read_pickle(results_filepath)
@@ -901,9 +906,14 @@ class Stock:
 
         def export_data(df):
 
-            dataframe = pd.read_pickle(f'{df.title()}\\1d_hld.pkl')
-            xlsx_filepath = Path(Path.cwd())/df.title()/'1d_hld.xlsx'
-            f'{df.title()}\\1d_hld.xlsx'
+            if not self.single_stock:
+                dataframe = pd.read_pickle(f'{df.title()}\\1D_all.pkl')
+                xlsx_filepath = Path(Path.cwd())/df.title()/'1D_all.xlsx'
+            else:
+                dataframe = pd.read_pickle(
+                    f'{df.title()}\\{self.ticker_tf}.pkl')
+                xlsx_filepath = Path(Path.cwd())/df.title() / \
+                    f'{self.ticker_tf}.xlsx'
             dataframe.to_excel(xlsx_filepath)
 
             data_wb = openpyxl.load_workbook(xlsx_filepath)
@@ -938,11 +948,14 @@ class Stock:
         export_data('results')
         export_data('stats')
 
-    def visualise(self):
+    def visualise(self, visualize):
         def get_dates(date):
             date1 = dt_to_str(str_to_dt(date) - timedelta(line_length))
             date2 = dt_to_str(str_to_dt(date) + timedelta(line_length))
             return date1, date2
+
+        if not visualize:
+            return
 
         self.dict_plots, self.trades_plots = {}, {}
         for period in self.lst_prd:
@@ -976,66 +989,89 @@ class Stock:
         plt.show(block=True)
 
 
-ticker_regex = re.compile(r'([A-Z]+)_1D\.pkl')
-default_args = {
-    'convert_data': {'use_existing': False},
-    'get_ohlc_table': {'start_dt': '', 'end_dt': '', 'use_yfin': False,
-                       'same_folder': True},
-    'get_periods': {'pct_drop': 20, 'sec_drop': 30, 'only_rec': False},
-    'get_resistances': {'stop_pct': .5, 'take_pct': 1.5, 'default_pct': 9,
-                        'res_diff': 7.5, 'hld_bef': 3, 'hld_aft': 3},
-    'get_triggers': {'days_apart': 7, 'inv_days': 180, 'hld_bef': 3,
-                     'hld_aft': 7, 'hg_diff': 2},
-    'get_trades': {'aut_stp_pct': 2, 'sell_pct': 1, 'sec_sell': .5,
-                   'hld_days': 0.0},
-    'export_pandas': {'export': False},
-    'export_excel': {'export': False}
-}
+def analyse_all():
+    ticker_regex = re.compile(r'([A-Z]+)_1D\.pkl')
 
-lst_results, lst_stats, stock_threads = [], [], []
-lst_tickers = []
-os.makedirs('1D', exist_ok=True)
-UpdateStockData('1D').update()
+    global lst_results, lst_stats
+    lst_results, lst_stats, stock_threads = [], [], []
+    lst_tickers = []
+    os.makedirs('1D', exist_ok=True)
+    UpdateStockData('1D').update()
 
-for filename in os.listdir(Path(Path.cwd())/'1D'):
-    if filename.endswith('_1D.pkl'):
-        ticker_element = ticker_regex.search(filename)
-        ticker = ticker_element.group(1)
-        lst_tickers.append(ticker)
+    for filename in os.listdir(Path(Path.cwd())/'1D'):
+        if filename.endswith('_1D.pkl'):
+            ticker_element = ticker_regex.search(filename)
+            ticker = ticker_element.group(1)
+            lst_tickers.append(ticker)
 
-ten_pct = round(len(lst_tickers) / 10, 1)
-to_print = []
-pct_progress = 10
-for multiple in range(1, 10):
-    to_print.append(ten_pct * multiple)
+    ten_pct = round(len(lst_tickers) / 10, 1)
+    to_print = []
+    pct_progress = 10
+    for multiple in range(1, 10):
+        to_print.append(ten_pct * multiple)
 
-for index, ticker in enumerate(lst_tickers):
-
-    for var in [0.0, 1.0, 2.0]:
-        updated_args = copy.deepcopy(default_args)
-        updated_args['get_trades']['hld_days'] = var
-        updated_args['get_ohlc_table']['start_dt'] = '1990'
-        if index + 1 == len(lst_tickers) and var == 2.0:
-            updated_args['export_pandas']['export'] = True
-            updated_args['export_excel']['export'] = True
-
-        stock_data = threading.Thread(
-            target=Stock, args=[ticker, updated_args])
+    for index, ticker in enumerate(lst_tickers):
+        if index + 1 == len(lst_tickers):
+            stock_data = threading.Thread(
+                target=Stock, args=[ticker],
+                kwargs={'start_dt': '1990', 'export_pandas': True,
+                        'export_excel': True})
+        else:
+            stock_data = threading.Thread(
+                target=Stock, args=[ticker],
+                kwargs={'start_dt': '1990'})
         stock_threads.append(stock_data)
         stock_data.start()
         while threading.active_count() > 20:
             time.sleep(1)
 
-    if to_print:
-        if index > to_print[0]:
-            print(f'{pct_progress}%')
-            pct_progress += 10
-            del to_print[0]
+        if to_print:
+            if index > to_print[0]:
+                print(f'{pct_progress}%')
+                pct_progress += 10
+                del to_print[0]
 
-for stock_thread in stock_threads:
-    stock_thread.join()
-CreateBatch('Results')
-CreateBatch('Stats')
+    for stock_thread in stock_threads:
+        stock_thread.join()
+    CreateBatch('Results')
+    CreateBatch('Stats')
 
-print('100%\n')
-print('Done')
+    print('100%\n')
+    print('Done!')
+
+
+def analyse_stock(ticker, use_existing=False, start_dt='',
+                  end_dt='', use_yfin=False, same_folder=True, pct_drop=20,
+                  sec_drop=30, only_rec=False, stop_pct=.5, take_pct=1.5,
+                  default_pct=9, res_diff=7.5, res_hld_bef=3, res_hld_aft=3,
+                  trg_hld_bef=3, trg_hld_aft=7,
+                  days_apart=7, inv_days=100, hg_diff=2, aut_stp_pct=2,
+                  sell_pct=1, sec_sell=.5, hld_days=1.0, export_pandas=True,
+                  export_excel=True, freq="1D", visualize=False):
+
+    global lst_results, lst_stats
+    lst_results, lst_stats = [], []
+    ticker_regex = re.compile(r'([A-Z]+)_1D\.pkl')
+    lst_tickers = []
+    for filename in os.listdir(Path(Path.cwd())/'1D'):
+        if filename.endswith('_1D.pkl'):
+            ticker_element = ticker_regex.search(filename)
+            a_ticker = ticker_element.group(1)
+            lst_tickers.append(a_ticker)
+
+    if ticker in lst_tickers:
+        Stock(ticker, use_existing=use_existing, start_dt=start_dt,
+              end_dt=end_dt, use_yfin=use_yfin, same_folder=same_folder,
+              pct_drop=pct_drop, sec_drop=sec_drop, only_rec=only_rec,
+              stop_pct=stop_pct, take_pct=take_pct, default_pct=default_pct,
+              res_diff=res_diff, res_hld_bef=res_hld_bef, res_hld_aft=res_hld_aft,
+              days_apart=days_apart, inv_days=inv_days, hg_diff=hg_diff,
+              aut_stp_pct=aut_stp_pct, sell_pct=sell_pct, sec_sell=sec_sell,
+              hld_days=hld_days, export_pandas=export_pandas,
+              trg_hld_bef=trg_hld_bef, trg_hld_aft=trg_hld_aft,
+              export_excel=export_excel, freq=freq, visualize=visualize,
+              single_stock=True)
+        print('Done!')
+    else:
+        print(f"Don't have {ticker} price data.")
+
